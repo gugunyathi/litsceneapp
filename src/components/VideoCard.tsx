@@ -8,8 +8,10 @@ import {
   VolumeX,
   Radio,
   Play,
+  Film,
 } from "lucide-react";
 import { type VibePost, timeAgo, slugify } from "@/data/vibes";
+import { Link } from "@tanstack/react-router";
 import { VibeBadge } from "./VibeBadge";
 import { PlacePin } from "./PlacePin";
 import { CommentsDrawer } from "./CommentsDrawer";
@@ -159,9 +161,8 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Top: place pin + vibe + live */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <PlacePin name={post.placeName} neighborhood={post.neighborhood} />
+      {/* Top right: vibe + live */}
+      <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="flex flex-col items-end gap-2">
           <VibeBadge score={post.vibeScore} />
           {post.isLive && (
@@ -173,6 +174,24 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Middle Left: place pin + reels */}
+      <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-3 pointer-events-auto">
+        <PlacePin name={post.placeName} neighborhood={post.neighborhood} />
+        
+        <Link
+          to="/reel/$slug"
+          params={{ slug: slugify(post.placeName) }}
+          className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform"
+        >
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
+            <Film className="h-3.5 w-3.5 text-primary-foreground" />
+          </span>
+          <span className="font-display text-[10px] font-bold uppercase tracking-widest text-foreground">
+            Reel
+          </span>
+        </Link>
       </div>
 
       {/* Right rail actions */}
@@ -216,7 +235,13 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
           <span className="text-xs font-semibold text-foreground/90">Share</span>
         </button>
         <button
-          onClick={onToggleMute}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMute();
+            if (videoRef.current) {
+              videoRef.current.muted = !muted;
+            }
+          }}
           className="grid h-10 w-10 place-items-center rounded-full glass-dark active:scale-90"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}

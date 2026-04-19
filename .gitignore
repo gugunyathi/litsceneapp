@@ -30,3 +30,60 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ============================================================
+# SECRETS & CREDENTIALS — Never commit these
+# ============================================================
+
+# Environment variable files (all variants)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# API keys / secrets files
+*.key
+*.secret
+secrets.json
+secrets.yaml
+secrets.yml
+secrets.toml
+*secret*
+*secrets*
+*credentials*
+
+# Private keys & certificates
+*.pem
+*.p12
+*.pfx
+*.cert
+*.cer
+*.crt
+*.csr
+*.der
+*.jks
+*.keystore
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Service account / cloud credential files
+service-account*.json
+*-service-account.json
+gcloud-credentials.json
+firebase-adminsdk*.json
+google-credentials.json
+
+# Auth tokens
+.npmrc-private
+.token
+*.token
+
+# Config files that may contain secrets
+config.local.*
+*.local.json
+*.local.yaml
+*.local.yml
+.vercel

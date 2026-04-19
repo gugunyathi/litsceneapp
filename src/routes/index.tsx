@@ -36,7 +36,7 @@ function FeedPage() {
   const [category, setCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -148,10 +148,7 @@ function FeedPage() {
             </div>
           ) : (
             <>
-              <h1 className="font-display text-2xl font-black tracking-tighter">
-                <span className="text-gradient-sunset">vibe</span>
-                <span className="text-foreground">check</span>
-              </h1>
+
               <div className="pointer-events-auto flex items-center gap-2">
                 <button
                   onClick={() => setIsSearching(true)}

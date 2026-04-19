@@ -433,6 +433,22 @@ export function getPostsByPlace(placeName: string): VibePost[] {
   );
 }
 
+/**
+ * Reel Algorithm: Fetch videos from a specific spot,
+ * arranged closest to realtime (latest to oldest),
+ * maximum past 1 hour from realtime.
+ */
+export function getReelPostsForPlace(slug: string): VibePost[] {
+  const oneHourAgo = BASE_TIME - 60 * 60 * 1000;
+  
+  return VIBE_POSTS
+    .filter((p) => slugify(p.placeName) === slug)
+    // Enforce maximum past 1 hour timeframe
+    .filter((p) => new Date(p.postedAt).getTime() >= oneHourAgo)
+    // Sort closest to real time (latest to oldest)
+    .sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
+}
+
 export interface VenueSummary {
   placeName: string;
   slug: string;

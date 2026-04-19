@@ -15,6 +15,7 @@ import { Route as MapRouteImport } from './routes/map'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReelSlugRouteImport } from './routes/reel.$slug'
 import { Route as PlaceSlugRouteImport } from './routes/place.$slug'
 import { Route as LiveSlugRouteImport } from './routes/live.$slug'
 
@@ -48,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReelSlugRoute = ReelSlugRouteImport.update({
+  id: '/reel/$slug',
+  path: '/reel/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaceSlugRoute = PlaceSlugRouteImport.update({
   id: '/place/$slug',
   path: '/place/$slug',
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/live/$slug': typeof LiveSlugRoute
   '/place/$slug': typeof PlaceSlugRoute
+  '/reel/$slug': typeof ReelSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/live/$slug': typeof LiveSlugRoute
   '/place/$slug': typeof PlaceSlugRoute
+  '/reel/$slug': typeof ReelSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/live/$slug': typeof LiveSlugRoute
   '/place/$slug': typeof PlaceSlugRoute
+  '/reel/$slug': typeof ReelSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/live/$slug'
     | '/place/$slug'
+    | '/reel/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/live/$slug'
     | '/place/$slug'
+    | '/reel/$slug'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/live/$slug'
     | '/place/$slug'
+    | '/reel/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   PostRoute: typeof PostRoute
   ProfileRoute: typeof ProfileRoute
   PlaceSlugRoute: typeof PlaceSlugRoute
+  ReelSlugRoute: typeof ReelSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -177,6 +190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reel/$slug': {
+      id: '/reel/$slug'
+      path: '/reel/$slug'
+      fullPath: '/reel/$slug'
+      preLoaderRoute: typeof ReelSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/place/$slug': {
       id: '/place/$slug'
       path: '/place/$slug'
@@ -212,7 +232,17 @@ const rootRouteChildren: RootRouteChildren = {
   PostRoute: PostRoute,
   ProfileRoute: ProfileRoute,
   PlaceSlugRoute: PlaceSlugRoute,
+  ReelSlugRoute: ReelSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
