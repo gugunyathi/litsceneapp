@@ -1,10 +1,9 @@
 {
-  "projectId": "gen-lang-client-0967670991",
-  "appId": "1:708846366170:web:5723ed7fb8fe89c9dc64e3",
-  "apiKey": "AIzaSyBEHcE3K6RBHPCLZYEEhs0YfmvqJ87aFHY",
-  "authDomain": "gen-lang-client-0967670991.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-9bc32663-5177-4e7a-a4eb-41151962bb27",
-  "storageBucket": "gen-lang-client-0967670991.firebasestorage.app",
-  "messagingSenderId": "708846366170",
-  "measurementId": ""
+  "projectId": "litsceneapp",
+  "appId": "1:530146093584:web:004839b93bc91dd427f895",
+  "apiKey": "AIzaSyBkqB7JTXjMg30BIRem8cyL99TjfQjZOyw",
+  "authDomain": "litsceneapp.firebaseapp.com",
+  "storageBucket": "litsceneapp.firebasestorage.app",
+  "messagingSenderId": "530146093584",
+  "measurementId": "G-4W0STBJQ83"
 }

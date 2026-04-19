@@ -39,6 +39,12 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [voted, setVoted] = useState(false);
+  
+  // Tag Location Modal State
+  const [tagModalOpen, setTagModalOpen] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [isModMode, setIsModMode] = useState(false);
+
   const { comments } = useComments(post.id);
   const commentCount = post.comments + comments.filter((c) => !c.id.startsWith("c")).length;
 
@@ -186,10 +192,17 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             neighborhood={post.neighborhood} 
             status={post.verificationStatus} 
           />
+          {post.verificationStatus === "crowdsource" && (
+            <button 
+              className="absolute inset-x-0 inset-y-0 z-20 w-full h-full cursor-pointer"
+              onClick={(e) => { e.preventDefault(); setTagModalOpen(true); }}
+              aria-label="Tag Location"
+            />
+          )}
           {/* Mod Override (Simulated) */}
           <button 
             onClick={() => toast("Mod Override Panel 🛡️", { description: "You can now edit the name, category, or delete the tag entirely." })}
-            className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
+            className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
             title="Moderator Edit"
           >
             <Shield className="h-3 w-3" />
@@ -326,6 +339,73 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         placeName={post.placeName}
         status={post.verificationStatus}
       />
+
+      {/* Tagger Modal */}
+      <AnimatePresence>
+        {tagModalOpen && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTagModalOpen(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: 200, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 200, opacity: 0 }}
+              className="relative w-full max-w-sm rounded-2xl glass-dark border border-border/40 p-5 shadow-soft z-10"
+            >
+              <h3 className="font-display font-black text-xl mb-1">Tag Location</h3>
+              <p className="text-xs text-foreground/60 mb-5">Know this spot? Help the community out by tagging it.</p>
+              
+              <input
+                autoFocus
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="Where is this?"
+                className="w-full bg-background/50 border border-border/40 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 mb-4"
+              />
+
+              <div className="flex items-center gap-2 mb-5">
+                <input 
+                  type="checkbox" 
+                  id={`mod-check-${post.id}`} 
+                  checked={isModMode} 
+                  onChange={(e) => setIsModMode(e.target.checked)} 
+                  className="accent-primary"
+                />
+                <label htmlFor={`mod-check-${post.id}`} className="text-[10px] text-foreground/60 uppercase tracking-widest font-bold">Simulate: I am a Verified Mod</label>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTagModalOpen(false)}
+                  className="flex-1 glass text-xs font-bold py-2.5 rounded-xl active:scale-95 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={tagInput.trim().length < 2}
+                  onClick={() => {
+                    setTagModalOpen(false);
+                    if (isModMode) {
+                      toast.success(`Location Tagged: ${tagInput} ✅`, { description: "You are a Verified Mod, so it saved instantly!" });
+                    } else {
+                      toast("Suggestion Submitted 📍", { description: "Sent to AI and Mods for final verification." });
+                    }
+                    setTagInput("");
+                  }}
+                  className="flex-1 bg-gradient-sunset text-primary-foreground shadow-glow-coral text-xs font-black uppercase tracking-widest py-2.5 rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+                >
+                  Submit
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

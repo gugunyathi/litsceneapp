@@ -1,19 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, X } from "lucide-react";
-import { VIBE_POSTS, type Category } from "@/data/vibes";
+import { type Category } from "@/data/vibes";
 import { PROMO_POSTS, type PromoPost } from "@/data/promos";
+import { fetchAllPosts } from "@/lib/api";
 import { SwipeableFeedCard } from "@/components/SwipeableFeedCard";
 import { PromotedCard } from "@/components/PromotedCard";
 import { CategoryRail } from "@/components/CategoryRail";
 import { BottomNav } from "@/components/BottomNav";
 import { useFirebase } from "@/lib/FirebaseContext";
+import { type VibePost } from "@/data/vibes";
 
 type FeedItem =
-  | { kind: "post"; id: string; data: (typeof VIBE_POSTS)[number] }
+  | { kind: "post"; id: string; data: VibePost }
   | { kind: "promo"; id: string; data: PromoPost };
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    // This allows the server to fetch directly from your new Firebase backend!
+    const posts = await fetchAllPosts();
+    return { posts };
+  },
   head: () => ({
     meta: [
       { title: "VibeCheck — see the vibe before you go" },
@@ -33,15 +40,16 @@ export const Route = createFileRoute("/")({
 });
 
 function FeedPage() {
+  const { posts } = Route.useLoaderData();
   const [category, setCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true); // Must start muted for browser autoplay!
   const [activeIdx, setActiveIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const items = useMemo<FeedItem[]>(() => {
-    let filtered = VIBE_POSTS;
+    let filtered = posts;
 
     // Apply search filter first
     if (searchQuery.trim() !== "") {
@@ -71,7 +79,7 @@ function FeedPage() {
         });
     }
     return out;
-  }, [category, searchQuery]);
+  }, [category, searchQuery, posts]);
 
   // observe which card is in view
   useEffect(() => {

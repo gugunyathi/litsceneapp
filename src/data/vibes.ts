@@ -20,16 +20,17 @@ export interface VibePost {
   verificationStatus?: "verified" | "unverified" | "crowdsource";
 }
 
-// Vertical sample videos (Google's CDN — public sample assets)
+// Vertical sample videos located in public folder
 const SAMPLE_VIDEOS = [
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-  "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+  "/bowld.mp4",
+  "/coppersbelair.mp4",
+  "/d481.mp4",
+  "/d482.mp4",
+  "/d483.mp4",
+  "/laparadanorthriding.mp4",
+  "/mojalove.mp4",
+  "/rockets1.mp4",
+  "/rockets2.mp4",
 ];
 
 const POSTERS = [
