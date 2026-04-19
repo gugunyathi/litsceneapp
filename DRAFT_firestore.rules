@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // User Profile Validation
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['handle', 'firePoints', 'createdAt']) &&
+        data.handle is string && data.handle.size() > 0 && data.handle.size() <= 30 &&
+        data.firePoints is number &&
+        data.createdAt == request.time &&
+        (data.get('avatar', '') is string) &&
+        (data.get('updatedAt', request.time) == request.time);
+    }
+
+    // Post Validation
+    function isValidPost(data) {
+      return data.keys().hasAll(['authorId', 'username', 'videoUrl', 'placeName', 'category', 'likesCount', 'commentsCount', 'postedAt']) &&
+        data.authorId == request.auth.uid &&
+        data.username is string && data.username.size() <= 30 &&
+        data.videoUrl is string && data.videoUrl.size() <= 500 &&
+        data.placeName is string && data.placeName.size() <= 100 &&
+        data.category is string && data.category.size() <= 30 &&
+        data.likesCount is number &&
+        data.commentsCount is number &&
+        data.postedAt == request.time &&
+        (data.get('poster', '') is string) &&
+        (data.get('neighborhood', '') is string) &&
+        (data.get('city', '') is string) &&
+        (data.get('lat', 0.0) is number) &&
+        (data.get('lng', 0.0) is number) &&
+        (data.get('vibeScore', 0) is number) &&
+        (data.get('caption', '') is string) &&
+        (data.get('isLive', false) is bool) &&
+        (data.get('updatedAt', request.time) == request.time);
+    }
+    
+    function isValidPostUpdate(data) {
+      return data.authorId == existing().authorId && // immutable
+        data.postedAt == existing().postedAt &&      // immutable
+        data.username is string && data.username.size() <= 30 &&
+        data.videoUrl is string && data.videoUrl.size() <= 500 &&
+        data.placeName is string && data.placeName.size() <= 100 &&
+        data.category is string && data.category.size() <= 30 &&
+        data.likesCount is number &&
+        data.commentsCount is number &&
+        (data.get('poster', '') is string) &&
+        (data.get('neighborhood', '') is string) &&
+        (data.get('city', '') is string) &&
+        (data.get('lat', existing().get('lat', 0.0)) is number) &&
+        (data.get('lng', existing().get('lng', 0.0)) is number) &&
+        (data.get('vibeScore', 0) is number) &&
+        (data.get('caption', '') is string) &&
+        (data.get('isLive', false) is bool) &&
+        // Timestamp must match request.time on update
+        data.get('updatedAt', request.time) == request.time;
+    }
+
+    // Comment Validation
+    function isValidComment(data, parentId) {
+      return data.keys().hasAll(['postId', 'authorId', 'username', 'rating', 'text', 'upvotes', 'createdAt']) &&
+        data.postId == parentId &&
+        data.authorId == request.auth.uid &&
+        data.username is string && data.username.size() <= 30 &&
+        data.rating is string && data.rating.size() <= 20 &&
+        data.text is string && data.text.size() > 0 && data.text.size() <= 500 &&
+        data.upvotes is number &&
+        data.createdAt == request.time &&
+        (data.get('avatar', '') is string) &&
+        (data.get('honest', false) is bool);
+    }
+
+    // Booking Validation
+    function isValidBooking(data) {
+      return data.keys().hasAll(['userId', 'type', 'placeName', 'placeSlug', 'confirmationCode', 'status', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.type is string && (data.type == 'table' || data.type == 'ticket') &&
+        data.placeName is string && data.placeName.size() <= 100 &&
+        data.placeSlug is string && data.placeSlug.size() <= 100 &&
+        data.confirmationCode is string && data.confirmationCode.size() <= 50 &&
+        data.status is string && (data.status == 'upcoming' || data.status == 'past' || data.status == 'cancelled') &&
+        data.createdAt == request.time &&
+        (data.get('cover', '') is string) &&
+        (data.get('partySize', 1) is number) &&
+        (data.get('date', '') is string) &&
+        (data.get('timeLabel', '') is string) &&
+        (data.get('eventTitle', '') is string) &&
+        (data.get('ticketPrice', 0) is number) &&
+        (data.get('updatedAt', request.time) == request.time);
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && existing().handle == request.auth.uid; // Block all list queries functionally for now as no feature requires it
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && incoming().keys().size() <= 6;
+      allow update: if isOwner(userId) && isValidId(userId) && 
+                      isValidUserProfile(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['handle', 'avatar', 'updatedAt']);
+    }
+
+    // Bookings Subcollection (isolated by user)
+    match /users/{userId}/bookings/{bookingId} {
+      allow read: if isOwner(userId) && isValidId(userId) && isValidId(bookingId);
+      allow list: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidId(bookingId) && 
+        isValidBooking(incoming()) && incoming().keys().size() <= 15;
+      allow update: if isOwner(userId) && isValidId(userId) && isValidId(bookingId) && 
+        isValidBooking(incoming()) && 
+        existing().status != 'cancelled' && existing().status != 'past' && // Terminal states lock
+        existing().userId == incoming().userId && // immutable user
+        existing().createdAt == incoming().createdAt && // immutable created
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+    }
+
+    // Posts Collection
+    match /posts/{postId} {
+      allow read: if isSignedIn() && isValidId(postId);
+      allow list: if isSignedIn(); // Requires rules-side restriction? Realistically feed is global but you must be signed in to view.
+      
+      allow create: if isSignedIn() && isValidId(postId) && 
+        isValidPost(incoming()) && incoming().keys().size() <= 17;
+
+      allow update: if isSignedIn() && isValidId(postId) &&
+        isValidPostUpdate(incoming()) && (
+          // Action: Upvote/Comment Increment
+          (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'updatedAt'])) ||
+          // Action: Edit Caption or isLive state (author only)
+          (isOwner(existing().authorId) && incoming().diff(existing()).affectedKeys().hasOnly(['caption', 'isLive', 'updatedAt']))
+        );
+      allow delete: if isOwner(existing().authorId);
+    }
+    
+    // Comments Subcollection
+    match /posts/{postId}/comments/{commentId} {
+      allow read: if isSignedIn() && isValidId(postId) && isValidId(commentId);
+      allow list: if isSignedIn() && isValidId(postId); // can list all comments for a post
+      
+      allow create: if isSignedIn() && isValidId(postId) && isValidId(commentId) &&
+        isValidComment(incoming(), postId) && incoming().keys().size() <= 10 &&
+        exists(/databases/$(database)/documents/posts/$(postId)); // must exist
+
+      allow update: if isSignedIn() && isValidId(postId) && isValidId(commentId) &&
+        isValidComment(incoming(), postId) && (
+          // Increment upvotes
+          incoming().diff(existing()).affectedKeys().hasOnly(['upvotes'])
+        );
+      allow delete: if isOwner(existing().authorId);
+    }
+  }
+}

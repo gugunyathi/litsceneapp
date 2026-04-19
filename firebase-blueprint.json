@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "User profile data including fire points and roles.",
+      "type": "object",
+      "properties": {
+        "handle": { "type": "string" },
+        "avatar": { "type": "string" },
+        "firePoints": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["handle", "firePoints", "createdAt"]
+    },
+    "post": {
+      "title": "Vibe Post",
+      "description": "A video post capturing a vibe at a place.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "username": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "poster": { "type": "string" },
+        "placeName": { "type": "string" },
+        "category": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "city": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "vibeScore": { "type": "number" },
+        "caption": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "isLive": { "type": "boolean" },
+        "postedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["authorId", "username", "videoUrl", "placeName", "category", "likesCount", "commentsCount", "postedAt"]
+    },
+    "comment": {
+      "title": "Comment",
+      "description": "A comment/review on a specific post.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rating": { "type": "string" },
+        "text": { "type": "string" },
+        "upvotes": { "type": "number" },
+        "honest": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["postId", "authorId", "username", "rating", "text", "upvotes", "createdAt"]
+    },
+    "booking": {
+      "title": "Booking",
+      "description": "A user's booking for a table or ticket.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "placeName": { "type": "string" },
+        "placeSlug": { "type": "string" },
+        "cover": { "type": "string" },
+        "partySize": { "type": "number" },
+        "date": { "type": "string" },
+        "timeLabel": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "ticketPrice": { "type": "number" },
+        "confirmationCode": { "type": "string" },
+        "status": { "type": "string", "enum": ["upcoming", "past", "cancelled"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "placeName", "placeSlug", "confirmationCode", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/userProfile" },
+      "description": "Stores user profiles."
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/post" },
+      "description": "Stores all video vibe posts."
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/comment" },
+      "description": "Stores comments nested inside a post to isolate them."
+    },
+    "/users/{userId}/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/booking" },
+      "description": "Stores user bookings inside their user profile (Split Collection Architecture)."
+    }
+  }
+}

@@ -1,0 +1,187 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * VIBECHECK — Sunset Miami design system.
+ * Coral, magenta, deep indigo. Glowing, soft, party-ready.
+ * All colors in oklch. Use semantic tokens only.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-coral: var(--coral);
+  --color-magenta: var(--magenta);
+  --color-indigo-deep: var(--indigo-deep);
+  --color-sunset: var(--sunset);
+  --color-vibe: var(--vibe);
+
+  --font-display: "Unbounded", "Space Grotesk", sans-serif;
+  --font-body: "Space Grotesk", system-ui, sans-serif;
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Sunset Miami palette */
+  --background: oklch(0.14 0.05 285);
+  --foreground: oklch(0.98 0.01 60);
+
+  --card: oklch(0.18 0.06 285);
+  --card-foreground: oklch(0.98 0.01 60);
+
+  --popover: oklch(0.18 0.06 285);
+  --popover-foreground: oklch(0.98 0.01 60);
+
+  --primary: oklch(0.72 0.22 25);          /* coral */
+  --primary-foreground: oklch(0.14 0.05 285);
+
+  --secondary: oklch(0.62 0.27 350);        /* magenta */
+  --secondary-foreground: oklch(0.98 0.01 60);
+
+  --muted: oklch(0.24 0.05 285);
+  --muted-foreground: oklch(0.72 0.04 285);
+
+  --accent: oklch(0.78 0.18 60);            /* warm gold sunset */
+  --accent-foreground: oklch(0.14 0.05 285);
+
+  --destructive: oklch(0.65 0.27 25);
+  --destructive-foreground: oklch(0.98 0.01 60);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.72 0.22 25);
+
+  --coral: oklch(0.74 0.22 25);
+  --magenta: oklch(0.62 0.27 350);
+  --indigo-deep: oklch(0.22 0.10 280);
+  --sunset: oklch(0.78 0.18 55);
+  --vibe: oklch(0.78 0.20 45);
+
+  /* Gradients */
+  --gradient-sunset: linear-gradient(135deg, oklch(0.72 0.22 25) 0%, oklch(0.62 0.27 350) 50%, oklch(0.32 0.15 285) 100%);
+  --gradient-vibe: linear-gradient(180deg, transparent 0%, oklch(0.14 0.05 285 / 0.85) 70%, oklch(0.14 0.05 285) 100%);
+  --gradient-glow: radial-gradient(ellipse at top, oklch(0.62 0.27 350 / 0.35), transparent 60%);
+  --gradient-fire: linear-gradient(135deg, oklch(0.78 0.20 60), oklch(0.72 0.22 25), oklch(0.62 0.27 350));
+  --gradient-card: linear-gradient(160deg, oklch(0.22 0.08 285 / 0.9), oklch(0.18 0.06 285 / 0.6));
+
+  /* Shadows / glows */
+  --shadow-glow-coral: 0 0 40px oklch(0.72 0.22 25 / 0.5), 0 0 80px oklch(0.72 0.22 25 / 0.25);
+  --shadow-glow-magenta: 0 0 30px oklch(0.62 0.27 350 / 0.55);
+  --shadow-soft: 0 10px 40px -10px oklch(0 0 0 / 0.6);
+  --shadow-pin: 0 4px 20px oklch(0.62 0.27 350 / 0.6);
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark {
+  /* Same as root — app is dark by default */
+  --background: oklch(0.14 0.05 285);
+  --foreground: oklch(0.98 0.01 60);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    background-image: var(--gradient-glow);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-sunset { background-image: var(--gradient-sunset); }
+  .bg-gradient-vibe { background-image: var(--gradient-vibe); }
+  .bg-gradient-fire { background-image: var(--gradient-fire); }
+  .bg-gradient-card { background-image: var(--gradient-card); }
+  .shadow-glow-coral { box-shadow: var(--shadow-glow-coral); }
+  .shadow-glow-magenta { box-shadow: var(--shadow-glow-magenta); }
+  .shadow-pin { box-shadow: var(--shadow-pin); }
+  .text-gradient-sunset {
+    background-image: var(--gradient-sunset);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-fire {
+    background-image: var(--gradient-fire);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glass {
+    background: oklch(1 0 0 / 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid oklch(1 0 0 / 0.12);
+  }
+  .glass-dark {
+    background: oklch(0.14 0.05 285 / 0.55);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  .snap-y-mandatory {
+    scroll-snap-type: y mandatory;
+  }
+  .snap-start { scroll-snap-align: start; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  .animate-pulse-glow {
+    animation: pulse-glow 2.4s var(--ease-out-expo) infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 6px oklch(0.78 0.20 45 / 0.6)); }
+    50% { filter: drop-shadow(0 0 18px oklch(0.78 0.20 45 / 0.95)); }
+  }
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+}
