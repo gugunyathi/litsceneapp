@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
-import { useMemo, useState } from "react";
+import { APIProvider, Map, AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { VIBE_POSTS, CATEGORIES, type Category, fireScore } from "@/data/vibes";
 import { BottomNav } from "@/components/BottomNav";
@@ -21,6 +21,43 @@ export const Route = createFileRoute("/map")({
   component: MapPage,
 });
 
+function MapController() {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (!map) return;
+    
+    let exactGranted = false;
+
+    // 1. Fetch rough regional center fallback via IP Request immediately
+    fetch("https://get.geojs.io/v1/ip/geo.json")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!exactGranted && data.latitude && data.longitude) {
+          map.panTo({ lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) });
+          // Neighborhood level zoom
+          map.setZoom(12);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fire precise hardware GPS concurrently (overrides rough trace if allowed)
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          exactGranted = true;
+          map.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          map.setZoom(14); // Street level zoom
+        },
+        (err) => console.warn("Location permission denied", err),
+        { enableHighAccuracy: true }
+      );
+    }
+  }, [map]);
+
+  return null;
+}
+
 function MapPage() {
   const [category, setCategory] = useState<Category | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
@@ -29,7 +66,8 @@ function MapPage() {
     return category === "all" ? VIBE_POSTS : VIBE_POSTS.filter((p) => p.category === category);
   }, [category]);
 
-  const center = { lat: 25.79, lng: -80.17 };
+  // Default fallback center (Miami fallback)
+  const defaultCenter = { lat: 25.79, lng: -80.17 };
   const selectedPost = places.find((p) => p.id === selected);
 
   return (
@@ -37,13 +75,14 @@ function MapPage() {
       <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
         <Map
           mapId={MAP_ID}
-          defaultCenter={center}
-          defaultZoom={13}
+          defaultCenter={defaultCenter}
+          defaultZoom={11}
           gestureHandling="greedy"
           disableDefaultUI
           colorScheme="DARK"
           className="h-full w-full"
         >
+          <MapController />
           {places.map((p) => (
             <AdvancedMarker
               key={p.id}

@@ -17,6 +17,7 @@ import { VibeBadge } from "./VibeBadge";
 import { PlacePin } from "./PlacePin";
 import { CommentsDrawer } from "./CommentsDrawer";
 import { useComments } from "@/data/comments";
+import { trackVibeInteraction } from "@/hooks/useVibeAlgorithm";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -72,7 +73,10 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       // Double tap detected
       lastTapRef.current = 0; // reset
-      if (!liked) setLiked(true);
+      if (!liked) {
+        setLiked(true);
+        trackVibeInteraction(post.category);
+      }
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 700);
 
@@ -261,7 +265,10 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
       {/* Right rail actions */}
       <div className="absolute bottom-28 right-3 z-10 flex flex-col items-center gap-5">
         <button
-          onClick={() => setLiked((s) => !s)}
+          onClick={() => {
+            if (!liked) trackVibeInteraction(post.category);
+            setLiked((s) => !s);
+          }}
           className="flex flex-col items-center gap-1 transition-transform active:scale-90"
         >
           <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">

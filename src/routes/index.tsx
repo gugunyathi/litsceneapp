@@ -10,6 +10,7 @@ import { CategoryRail } from "@/components/CategoryRail";
 import { BottomNav } from "@/components/BottomNav";
 import { useFirebase } from "@/lib/FirebaseContext";
 import { type VibePost } from "@/data/vibes";
+import { useVibeAlgorithm } from "@/hooks/useVibeAlgorithm";
 
 type FeedItem =
   | { kind: "post"; id: string; data: VibePost }
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/")({
 
 function FeedPage() {
   const { posts } = Route.useLoaderData();
+  const { sortForYou } = useVibeAlgorithm(posts);
   const [category, setCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -63,9 +65,16 @@ function FeedPage() {
       filtered = filtered.filter((p) => p.category === category);
     }
 
-    const sorted = [...filtered].sort(
-      (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
-    );
+    let sorted;
+    if (category === "all" && searchQuery.trim() === "") {
+      // FOR YOU FEED: Uses location, time zone, and preferences
+      sorted = sortForYou(filtered);
+    } else {
+      // Chronological sort for specific searches/categories
+      sorted = [...filtered].sort(
+        (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+      );
+    }
 
     const out: FeedItem[] = sorted.map((p) => ({ kind: "post", id: p.id, data: p }));
 
