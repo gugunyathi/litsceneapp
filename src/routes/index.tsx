@@ -117,7 +117,13 @@ function FeedPage() {
     if (activeIdx >= 5) {
       requireAuth();
     }
-  }, [activeIdx, requireAuth]);
+    
+    // Algorithm: Track views to refine the "For You" feed
+    const currentPost = items[activeIdx];
+    if (currentPost && currentPost.kind === "post") {
+      trackVibeInteraction(currentPost.data.category);
+    }
+  }, [activeIdx, requireAuth, items]);
 
   // reset on filter change
   useEffect(() => {
