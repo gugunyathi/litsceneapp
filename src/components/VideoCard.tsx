@@ -9,6 +9,7 @@ import {
   Radio,
   Play,
   Film,
+  Shield,
 } from "lucide-react";
 import { type VibePost, timeAgo, slugify } from "@/data/vibes";
 import { Link } from "@tanstack/react-router";
@@ -37,6 +38,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [showHeart, setShowHeart] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [voted, setVoted] = useState(false);
   const { comments } = useComments(post.id);
   const commentCount = post.comments + comments.filter((c) => !c.id.startsWith("c")).length;
 
@@ -177,21 +179,70 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
       </div>
 
       {/* Middle Left: place pin + reels */}
-      <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-3 pointer-events-auto">
-        <PlacePin name={post.placeName} neighborhood={post.neighborhood} />
+      <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-2 pointer-events-auto">
+        <div className="relative group">
+          <PlacePin 
+            name={post.placeName} 
+            neighborhood={post.neighborhood} 
+            status={post.verificationStatus} 
+          />
+          {/* Mod Override (Simulated) */}
+          <button 
+            onClick={() => toast("Mod Override Panel 🛡️", { description: "You can now edit the name, category, or delete the tag entirely." })}
+            className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
+            title="Moderator Edit"
+          >
+            <Shield className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Waze style verification prompt */}
+        {post.verificationStatus === "unverified" && !voted && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="glass-dark rounded-xl p-2.5 shadow-soft border border-accent/20 w-[180px]"
+          >
+            <p className="text-[11px] font-bold mb-2 leading-tight">
+              Is this {post.placeName}?
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setVoted(true);
+                  toast.success("Thanks for verifying!", { description: "+5 Trust Score. 9 more 'Yes' votes to verify." });
+                }}
+                className="flex-1 bg-accent/20 active:bg-accent/30 text-accent font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-accent/30"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {
+                  setVoted(true);
+                  toast("Flagged for review", { description: "We'll wait for more community input." });
+                }}
+                className="flex-1 bg-foreground/10 active:bg-foreground/20 text-foreground font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-foreground/10"
+              >
+                No
+              </button>
+            </div>
+          </motion.div>
+        )}
         
-        <Link
-          to="/reel/$slug"
-          params={{ slug: slugify(post.placeName) }}
-          className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform"
-        >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
-            <Film className="h-3.5 w-3.5 text-primary-foreground" />
-          </span>
-          <span className="font-display text-[10px] font-bold uppercase tracking-widest text-foreground">
-            Reel
-          </span>
-        </Link>
+        {!post.verificationStatus || post.verificationStatus === "verified" ? (
+          <Link
+            to="/reel/$slug"
+            params={{ slug: slugify(post.placeName) }}
+            className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
+              <Film className="h-3.5 w-3.5 text-primary-foreground" />
+            </span>
+            <span className="font-display text-[10px] font-bold uppercase tracking-widest text-foreground">
+              Reel
+            </span>
+          </Link>
+        ) : null}
       </div>
 
       {/* Right rail actions */}
@@ -273,6 +324,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         onClose={() => setCommentsOpen(false)}
         postId={post.id}
         placeName={post.placeName}
+        status={post.verificationStatus}
       />
     </section>
   );

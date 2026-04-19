@@ -17,6 +17,7 @@ export interface VibePost {
   likes: number;
   comments: number;
   isLive?: boolean;
+  verificationStatus?: "verified" | "unverified" | "crowdsource";
 }
 
 // Vertical sample videos (Google's CDN — public sample assets)
@@ -100,6 +101,7 @@ export const VIBE_POSTS: VibePost[] = [
     caption: "golden hour with the girls 🌅",
     likes: 8_932,
     comments: 211,
+    verificationStatus: 'unverified',
   },
   {
     id: "3",
@@ -203,6 +205,24 @@ export const VIBE_POSTS: VibePost[] = [
     caption: "main stage went OFF",
     likes: 18_200,
     comments: 612,
+  },
+  {
+    id: "9",
+    videoUrl: SAMPLE_VIDEOS[0],
+    poster: POSTERS[1],
+    placeName: "Unknown Location",
+    category: "club",
+    neighborhood: "Somewhere in Miami",
+    city: "Miami",
+    lat: 25.78,
+    lng: -80.13,
+    vibeScore: 2,
+    postedAt: minutesAgo(2),
+    username: "@mysteryvibes",
+    caption: "where am I rn? 📍",
+    likes: 420,
+    comments: 12,
+    verificationStatus: "crowdsource",
   },
 ];
 
