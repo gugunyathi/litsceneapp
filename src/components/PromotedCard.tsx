@@ -39,6 +39,7 @@ export function PromotedCard({ promo, active, muted, onToggleMute }: Props) {
           ref={videoRef}
           src={promo.videoUrl}
           poster={promo.poster}
+          autoPlay
           loop
           playsInline
           muted={muted}

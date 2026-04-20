@@ -170,8 +170,6 @@ function FeedPage() {
               </button>
             </div>
           ) : (
-            <>
-
               <div className="pointer-events-auto flex items-center gap-2">
                 <button
                   onClick={() => setIsSearching(true)}
@@ -180,15 +178,7 @@ function FeedPage() {
                 >
                   <Search className="h-4 w-4" />
                 </button>
-                <button
-                  aria-label="For you"
-                  className="inline-flex items-center gap-1.5 rounded-full glass-dark px-3 py-1.5 text-xs font-display font-bold uppercase tracking-widest"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-accent" />
-                  For You
-                </button>
               </div>
-            </>
           )}
         </div>
 

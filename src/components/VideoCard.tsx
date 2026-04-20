@@ -49,6 +49,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [voted, setVoted] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // ── Cinematic / clean-screen mode ────────────────────────────────────────
   const [cinematic, setCinematic] = useState(false);
@@ -183,6 +184,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         ref={videoRef}
         src={post.videoUrl}
         poster={post.poster}
+        autoPlay
         loop
         playsInline
         muted={isMuted}
@@ -249,19 +251,10 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="contents"
+            className="contents pointer-events-none"
           >
-            {/* Top row: vibe badge + live + cinematic toggle */}
-            <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-              {/* Cinematic / full-screen button (top-left) */}
-              <button
-                onClick={(e) => { e.stopPropagation(); setCinematic(true); }}
-                className="grid h-9 w-9 place-items-center rounded-full glass-dark text-foreground/80 active:scale-90 transition-transform"
-                aria-label="Cinematic mode — hide UI"
-              >
-                <Tv2 className="h-4 w-4" />
-              </button>
-
+            {/* Top row: vibe badge + live */}
+            <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))] pointer-events-auto">
               {/* Right: badges */}
               <div className="flex flex-col items-end gap-2">
                 <VibeBadge score={post.vibeScore} />
@@ -287,13 +280,13 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 {post.verificationStatus === "crowdsource" && (
                   <button
                     className="absolute inset-x-0 inset-y-0 z-20 w-full h-full cursor-pointer"
-                    onClick={(e) => { e.preventDefault(); setTagModalOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setTagModalOpen(true); }}
                     aria-label="Tag Location"
                   />
                 )}
                 {isAdmin && (
                   <button
-                    onClick={() => setEditModalOpen(true)}
+                    onClick={(e) => { e.stopPropagation(); setEditModalOpen(true); }}
                     className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
                     title="Edit Location"
                   >
@@ -307,14 +300,15 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="glass-dark rounded-xl p-2.5 shadow-soft border border-accent/20 w-[180px]"
+                  className="glass-dark rounded-xl p-2.5 shadow-soft border border-accent/20 w-[180px] pointer-events-auto"
                 >
                   <p className="text-[11px] font-bold mb-2 leading-tight">
                     Is this {post.placeName}?
                   </p>
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={async () => {
+                      onClick={async (e) => {
+                        e.stopPropagation();
                         if (!user) { toast.error("Must be logged in to vote"); return; }
                         setVoted(true);
                         await recordLocationVote(user.uid, post.id, "yes");
@@ -325,7 +319,8 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                       Yes
                     </button>
                     <button
-                      onClick={async () => {
+                      onClick={async (e) => {
+                        e.stopPropagation();
                         if (!user) { toast.error("Must be logged in to vote"); return; }
                         setVoted(true);
                         await recordLocationVote(user.uid, post.id, "no");
@@ -343,7 +338,8 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 <Link
                   to="/reel/$slug"
                   params={{ slug: slugify(post.placeName) }}
-                  className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1"
+                  onClick={(e) => e.stopPropagation()}
+                  className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1 pointer-events-auto"
                 >
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
                     <Film className="h-3.5 w-3.5 text-primary-foreground" />
@@ -356,10 +352,23 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             </div>
 
             {/* Right rail actions */}
-            <div className="absolute bottom-28 right-3 z-10 flex flex-col items-center gap-5">
+            <div className="absolute bottom-28 right-3 z-30 flex flex-col items-center gap-5 pointer-events-auto">
+              {/* Cinematic TV Mode */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setCinematic(true); }}
+                className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+                aria-label="Cinematic mode — hide UI"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
+                  <Tv2 className="h-6 w-6 text-foreground" />
+                </span>
+                <span className="text-xs font-semibold text-transparent">Clear</span>
+              </button>
+
               {/* Like */}
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (!liked) trackVibeInteraction(post.category);
                   setLiked((s) => !s);
                 }}
@@ -372,41 +381,51 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                     }`}
                   />
                 </span>
-                <span className="text-xs font-semibold text-foreground/90">
+                <span className="text-xs font-semibold text-foreground/90 drop-shadow-md">
                   {formatCount(post.likes + (liked ? 1 : 0))}
                 </span>
               </button>
 
               {/* Comments */}
               <button
-                onClick={() => setCommentsOpen(true)}
+                onClick={(e) => { e.stopPropagation(); setCommentsOpen(true); }}
                 className="flex flex-col items-center gap-1 active:scale-90"
               >
                 <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
                   <MessageCircle className="h-6 w-6" />
                 </span>
-                <span className="text-xs font-semibold text-foreground/90">
+                <span className="text-xs font-semibold text-foreground/90 drop-shadow-md">
                   {formatCount(commentCount)}
                 </span>
               </button>
 
               {/* Save */}
-              <button className="flex flex-col items-center gap-1 active:scale-90">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isSaved = !saved;
+                  setSaved(isSaved);
+                  toast(isSaved ? "Saved to Profile" : "Removed from saved", {
+                    description: isSaved ? "Find it in your Saved Spots tab." : undefined,
+                  });
+                }} 
+                className="flex flex-col items-center gap-1 active:scale-90"
+              >
                 <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
-                  <Bookmark className="h-6 w-6" />
+                  <Bookmark className={`h-6 w-6 transition-colors ${saved ? "fill-accent text-accent" : "text-foreground"}`} />
                 </span>
-                <span className="text-xs font-semibold text-foreground/90">Save</span>
+                <span className="text-xs font-semibold text-foreground/90 drop-shadow-md">Save</span>
               </button>
 
               {/* Share */}
-              <button onClick={handleShare} className="flex flex-col items-center gap-1 active:scale-90">
+              <button onClick={(e) => { e.stopPropagation(); handleShare(); }} className="flex flex-col items-center gap-1 active:scale-90">
                 <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
                   <Share2 className="h-6 w-6" />
                 </span>
-                <span className="text-xs font-semibold text-foreground/90">Share</span>
+                <span className="text-xs font-semibold text-foreground/90 drop-shadow-md">Share</span>
               </button>
 
-              {/* Volume — uses local isMuted state ───────────── */}
+              {/* Volume */}
               <button
                 onClick={handleToggleMute}
                 className="grid h-12 w-12 place-items-center rounded-full glass-dark active:scale-90 transition-transform"
@@ -421,10 +440,10 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             </div>
 
             {/* Bottom caption + meta */}
-            <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-24">
-              <div className="max-w-[78%] space-y-2">
+            <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-24 pointer-events-none">
+              <div className="max-w-[78%] space-y-2 pointer-events-auto">
                 <div className="flex items-center gap-2">
-                  <span className="font-display text-base font-bold text-gradient-sunset">
+                  <span className="font-display text-base font-bold text-gradient-sunset drop-shadow-sm">
                     {post.username}
                   </span>
                   <span className="text-xs text-foreground/60">· {timeAgo(post.postedAt)}</span>
