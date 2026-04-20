@@ -110,26 +110,7 @@ export function SwipeableFeedCard({ initialPost, active, muted, onToggleMute }: 
         </button>
       )}
 
-      {/* Venue counter pill */}
-      {venueChain.length > 1 && (
-        <div className="pointer-events-none absolute left-1/2 top-[max(7rem,calc(env(safe-area-inset-top)+6.5rem))] z-20 -translate-x-1/2">
-          <div className="glass-dark flex items-center gap-1 rounded-full px-2.5 py-1">
-            {venueChain.slice(0, 6).map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === venueIdx ? "w-5 bg-gradient-sunset" : "w-1.5 bg-foreground/30"
-                }`}
-              />
-            ))}
-            {venueChain.length > 6 && (
-              <span className="ml-1 text-[10px] font-bold text-foreground/60">
-                +{venueChain.length - 6}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* Swipe hint glow */}
       <motion.div

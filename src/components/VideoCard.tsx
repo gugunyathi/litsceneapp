@@ -40,6 +40,9 @@ function formatCount(n: number) {
   return String(n);
 }
 
+// Module-level variable to persist cinematic mode across video scrolling
+let isGlobalCinematic = false;
+
 export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user, isAdmin } = useFirebase();
@@ -52,17 +55,15 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [saved, setSaved] = useState(false);
 
   // ── Cinematic / clean-screen mode ────────────────────────────────────────
-  const [cinematic, setCinematic] = useState(false);
+  const [cinematic, setCinematic] = useState(isGlobalCinematic);
 
   useEffect(() => {
+    isGlobalCinematic = cinematic;
     if (cinematic) {
       document.body.classList.add("cinematic");
     } else {
       document.body.classList.remove("cinematic");
     }
-    return () => {
-      document.body.classList.remove("cinematic");
-    };
   }, [cinematic]);
 
   // ── Local mute state (source of truth for the <video> element) ───────────
@@ -113,7 +114,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
     };
 
     checkVote();
-  }, [user, post.id]);
+  }, [user, post.id, post.verificationStatus]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -130,18 +131,18 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   }, [active]);
 
   const handleTap = () => {
-    // In cinematic mode, any tap exits it
-    if (cinematic) {
-      setCinematic(false);
-      return;
-    }
-
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
     const v = videoRef.current;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       lastTapRef.current = 0;
+      
+      if (cinematic) {
+        setCinematic(false);
+        return;
+      }
+      
       if (!liked) {
         setLiked(true);
         trackVibeInteraction(post.category);
@@ -279,6 +280,19 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 )}
               </div>
             </div>
+
+            {/* Volume button (top-left below categories) */}
+            <button
+              onClick={handleToggleMute}
+              className="absolute left-4 top-[max(6rem,calc(env(safe-area-inset-top)+5.5rem))] z-20 grid h-10 w-10 place-items-center rounded-full glass-dark active:scale-90 transition-transform pointer-events-auto"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? (
+                <VolumeX className="h-5 w-5 text-foreground/80" />
+              ) : (
+                <Volume2 className="h-5 w-5 text-foreground" />
+              )}
+            </button>
 
             {/* Middle Left: place pin + reels */}
             <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-2 pointer-events-auto">
@@ -434,19 +448,6 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                   <Share2 className="h-6 w-6" />
                 </span>
                 <span className="text-xs font-semibold text-foreground/90 drop-shadow-md">Share</span>
-              </button>
-
-              {/* Volume */}
-              <button
-                onClick={handleToggleMute}
-                className="grid h-12 w-12 place-items-center rounded-full glass-dark active:scale-90 transition-transform"
-                aria-label={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? (
-                  <VolumeX className="h-5 w-5 text-foreground/80" />
-                ) : (
-                  <Volume2 className="h-5 w-5 text-foreground" />
-                )}
               </button>
             </div>
 
