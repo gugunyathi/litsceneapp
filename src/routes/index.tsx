@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Sparkles, X } from "lucide-react";
+import { Search, Sparkles, X, ListFilter } from "lucide-react";
 import { type Category } from "@/data/vibes";
 import { PROMO_POSTS, type PromoPost } from "@/data/promos";
 import { fetchAllPosts } from "@/lib/api";
@@ -49,6 +49,8 @@ function FeedPage() {
   const [muted, setMuted] = useState(false); // Volume on by default
   const [activeIdx, setActiveIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [vibeFilter, setVibeFilter] = useState<1 | 2 | 3 | null>(null);
+  const [showVibeFilterMenu, setShowVibeFilterMenu] = useState(false);
 
   const items = useMemo<FeedItem[]>(() => {
     let filtered = posts;
@@ -65,6 +67,10 @@ function FeedPage() {
       filtered = filtered.filter((p) => p.category === category);
     }
 
+    if (vibeFilter !== null) {
+      filtered = filtered.filter((p) => p.vibeScore === vibeFilter);
+    }
+
     let sorted;
     if (category === "all" && searchQuery.trim() === "") {
       // FOR YOU FEED: Uses location, time zone, and preferences
@@ -79,7 +85,7 @@ function FeedPage() {
     const out: FeedItem[] = sorted.map((p) => ({ kind: "post", id: p.id, data: p }));
 
     // Splice in promos only on the pure "all" feed (no search, no category)
-    if (category === "all" && searchQuery === "") {
+    if (category === "all" && searchQuery === "" && vibeFilter === null) {
       [...PROMO_POSTS]
         .sort((a, b) => b.insertAfterIndex - a.insertAfterIndex)
         .forEach((promo) => {
@@ -88,7 +94,7 @@ function FeedPage() {
         });
     }
     return out;
-  }, [category, searchQuery, posts]);
+  }, [category, searchQuery, vibeFilter, posts]);
 
   // observe which card is in view
   useEffect(() => {
@@ -178,6 +184,34 @@ function FeedPage() {
                 >
                   <Search className="h-4 w-4" />
                 </button>
+                <div className="relative pointer-events-auto">
+                  <button
+                    onClick={() => setShowVibeFilterMenu(!showVibeFilterMenu)}
+                    aria-label="Filter by Vibe"
+                    className={`grid h-9 w-9 place-items-center rounded-full glass-dark border transition-colors ${vibeFilter ? 'text-primary border-primary/50' : 'border-transparent'}`}
+                  >
+                    <ListFilter className="h-4 w-4" />
+                  </button>
+                  {showVibeFilterMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowVibeFilterMenu(false)} />
+                      <div className="absolute top-full left-0 mt-2 flex flex-col gap-1 glass-dark rounded-xl p-2 z-50 shadow-soft w-[110px] transform-origin-top animate-in fade-in zoom-in-95 duration-100">
+                        {([3, 2, 1] as const).map((score) => (
+                          <button
+                            key={score}
+                            onClick={() => {
+                              setVibeFilter(vibeFilter === score ? null : score);
+                              setShowVibeFilterMenu(false);
+                            }}
+                            className={`px-2 py-2 text-sm text-center rounded-lg whitespace-nowrap transition-colors flex items-center justify-center gap-1 ${vibeFilter === score ? 'bg-primary/20 text-primary border border-primary/20' : 'hover:bg-foreground/10 border border-transparent'}`}
+                          >
+                            {"🔥".repeat(score)}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
           )}
         </div>

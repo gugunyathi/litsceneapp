@@ -40,8 +40,24 @@ function formatCount(n: number) {
   return String(n);
 }
 
-// Module-level variable to persist cinematic mode across video scrolling
-let isGlobalCinematic = false;
+// Tiny event emitter for global cinematic mode persistence
+class CinematicState {
+  private active = false;
+  private listeners = new Set<(val: boolean) => void>();
+
+  get() { return this.active; }
+  set(val: boolean) {
+    this.active = val;
+    if (val) document.body.classList.add("cinematic");
+    else document.body.classList.remove("cinematic");
+    this.listeners.forEach(l => l(val));
+  }
+  subscribe(fn: (val: boolean) => void) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+}
+const globalCinematic = new CinematicState();
 
 export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -55,16 +71,15 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [saved, setSaved] = useState(false);
 
   // ── Cinematic / clean-screen mode ────────────────────────────────────────
-  const [cinematic, setCinematic] = useState(isGlobalCinematic);
+  const [cinematic, setCinematic] = useState(globalCinematic.get());
 
   useEffect(() => {
-    isGlobalCinematic = cinematic;
-    if (cinematic) {
-      document.body.classList.add("cinematic");
-    } else {
-      document.body.classList.remove("cinematic");
-    }
-  }, [cinematic]);
+    return globalCinematic.subscribe(setCinematic);
+  }, []);
+
+  const handleSetCinematic = (val: boolean) => {
+    globalCinematic.set(val);
+  };
 
   // ── Local mute state (source of truth for the <video> element) ───────────
   const [isMuted, setIsMuted] = useState(muted);
@@ -139,7 +154,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
       lastTapRef.current = 0;
       
       if (cinematic) {
-        setCinematic(false);
+        handleSetCinematic(false);
         return;
       }
       
@@ -380,7 +395,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             <div className="absolute bottom-28 right-3 z-30 flex flex-col items-center gap-5 pointer-events-auto">
               {/* Cinematic TV Mode */}
               <button
-                onClick={(e) => { e.stopPropagation(); setCinematic(true); }}
+                onClick={(e) => { e.stopPropagation(); handleSetCinematic(true); }}
                 className="flex flex-col items-center gap-1 transition-transform active:scale-90"
                 aria-label="Cinematic mode — hide UI"
               >
