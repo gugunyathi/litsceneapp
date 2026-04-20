@@ -127,6 +127,10 @@
     background-attachment: fixed;
   }
 
+  body.cinematic #bottom-nav {
+    display: none !important;
+  }
+
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.02em;

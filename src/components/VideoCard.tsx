@@ -54,6 +54,17 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   // ── Cinematic / clean-screen mode ────────────────────────────────────────
   const [cinematic, setCinematic] = useState(false);
 
+  useEffect(() => {
+    if (cinematic) {
+      document.body.classList.add("cinematic");
+    } else {
+      document.body.classList.remove("cinematic");
+    }
+    return () => {
+      document.body.classList.remove("cinematic");
+    };
+  }, [cinematic]);
+
   // ── Local mute state (source of truth for the <video> element) ───────────
   const [isMuted, setIsMuted] = useState(muted);
 
