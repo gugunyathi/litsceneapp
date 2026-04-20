@@ -10,7 +10,7 @@ import { CategoryRail } from "@/components/CategoryRail";
 import { BottomNav } from "@/components/BottomNav";
 import { useFirebase } from "@/lib/FirebaseContext";
 import { type VibePost } from "@/data/vibes";
-import { useVibeAlgorithm } from "@/hooks/useVibeAlgorithm";
+import { useVibeAlgorithm, trackVibeInteraction } from "@/hooks/useVibeAlgorithm";
 
 type FeedItem =
   | { kind: "post"; id: string; data: VibePost }
