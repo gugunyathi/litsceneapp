@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { X, MapPin, Search, Loader } from "lucide-react";
 import { motion } from "framer-motion";
 import { type VibePost } from "@/data/vibes";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 
 interface LocationEditModalProps {
   post: VibePost;
@@ -25,50 +26,41 @@ export function LocationEditModal({
   const [lat, setLat] = useState(post.lat);
   const [lng, setLng] = useState(post.lng);
   const [isSaving, setIsSaving] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    Array<{ name: string; address: string; lat: number; lng: number }>
-  >([]);
-  const [searching, setSearching] = useState(false);
 
-  // Search for locations using Nominatim (free geocoding)
-  const handleAddressSearch = async (query: string) => {
-    if (query.length < 3) {
-      setSuggestions([]);
+  // ── search bar autocomplete ────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchAC = usePlacesAutocomplete();
+
+  // ── place-name field autocomplete ─────────────────────────────────────────
+  const [placeNameFocused, setPlaceNameFocused] = useState(false);
+  const placeNameAC = usePlacesAutocomplete();
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  async function applyPlace(placeId: string, mainText: string, source: "search" | "placeName") {
+    const detail = await (source === "search"
+      ? searchAC.resolvePlaceDetails(placeId)
+      : placeNameAC.resolvePlaceDetails(placeId));
+
+    if (!detail) {
+      toast.error("Could not fetch place details. Please fill in manually.");
       return;
     }
 
-    setSearching(true);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
-      );
-      const data = await response.json();
-      setSuggestions(
-        data.map((item: any) => ({
-          name: item.name,
-          address: item.display_name,
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-        }))
-      );
-    } catch (error) {
-      console.error("Error searching locations", error);
-      toast.error("Failed to search locations");
-    } finally {
-      setSearching(false);
-    }
-  };
+    setPlaceName(detail.mainText || mainText);
+    if (detail.neighborhood) setNeighborhood(detail.neighborhood);
+    if (detail.city) setCity(detail.city);
+    if (detail.lat !== undefined) setLat(detail.lat);
+    if (detail.lng !== undefined) setLng(detail.lng);
 
-  const handleSuggestionSelect = (suggestion: (typeof suggestions)[0]) => {
-    setPlaceName(suggestion.name);
-    setCity(suggestion.address.split(",").pop()?.trim() || city);
-    setLat(suggestion.lat);
-    setLng(suggestion.lng);
-    setSuggestions([]);
+    // clear both dropdowns
+    searchAC.clearSuggestions();
+    placeNameAC.clearSuggestions();
     setSearchQuery("");
-  };
+  }
 
+  // ─────────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!placeName.trim() || !neighborhood.trim() || !city.trim()) {
       toast.error("Please fill in all fields");
@@ -78,21 +70,10 @@ export function LocationEditModal({
     setIsSaving(true);
     try {
       const postRef = doc(db, "posts", post.id);
-      const updates = {
-        placeName,
-        neighborhood,
-        city,
-        lat,
-        lng,
-        updatedAt: new Date(),
-      };
+      const updates = { placeName, neighborhood, city, lat, lng, updatedAt: new Date() };
       await updateDoc(postRef, updates);
       toast.success("Location updated successfully!");
-      const updatedPost: VibePost = {
-        ...post,
-        ...updates,
-      };
-      onSave?.(updatedPost);
+      onSave?.({ ...post, ...updates });
       onClose();
     } catch (error) {
       console.error("Error saving location", error);
@@ -111,6 +92,7 @@ export function LocationEditModal({
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
+      {/* backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -118,12 +100,15 @@ export function LocationEditModal({
         onClick={onClose}
         className="absolute inset-0 bg-background/80 backdrop-blur-sm"
       />
+
       <motion.div
         initial={{ y: 200, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 200, opacity: 0 }}
+        ref={containerRef}
         className="relative w-full max-w-sm rounded-2xl glass-dark border border-border/40 p-5 shadow-soft z-10 max-h-[90vh] overflow-y-auto"
       >
+        {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display font-black text-xl">Edit Location</h3>
           <button
@@ -135,58 +120,99 @@ export function LocationEditModal({
         </div>
 
         <div className="space-y-4">
-          {/* Address Search */}
+
+          {/* ── Search / Lookup ─────────────────────────────────────────── */}
           <div>
             <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
-              Search Address
+              Search Address or Place
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/50" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/50 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  handleAddressSearch(e.target.value);
+                  searchAC.fetchSuggestions(e.target.value);
                 }}
-                placeholder="Search for a place..."
+                placeholder="Search Google Maps…"
+                autoComplete="off"
                 className="w-full bg-background/50 border border-border/40 rounded-xl px-10 py-3 text-sm focus:outline-none focus:border-primary/50"
               />
-              {searching && (
+              {searchAC.isLoading && (
                 <Loader className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />
               )}
+
+              {/* Search suggestions dropdown */}
+              {searchAC.suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/40 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                  {searchAC.suggestions.map((s) => (
+                    <button
+                      key={s.placeId}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => applyPlace(s.placeId, s.mainText, "search")}
+                      className="w-full text-left px-3 py-2.5 hover:bg-foreground/10 border-b border-border/20 last:border-0 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{s.mainText}</p>
+                          <p className="text-[11px] text-foreground/60 truncate">{s.secondaryText}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/40 rounded-xl shadow-lg z-20 max-h-40 overflow-y-auto">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSuggestionSelect(s)}
-                    className="w-full text-left p-3 hover:bg-foreground/10 border-b border-border/20 last:border-0 transition-colors"
-                  >
-                    <p className="text-sm font-semibold">{s.name}</p>
-                    <p className="text-[11px] text-foreground/60 truncate">{s.address}</p>
-                  </button>
-                ))}
-              </div>
-            )}
+            <p className="mt-1.5 text-[10px] text-foreground/40">
+              Powered by Google Maps · selecting auto-fills all fields below
+            </p>
           </div>
 
-          {/* Place Name */}
-          <div>
+          {/* ── Place Name ──────────────────────────────────────────────── */}
+          <div className="relative">
             <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
               Place Name
             </label>
             <input
               type="text"
               value={placeName}
-              onChange={(e) => setPlaceName(e.target.value)}
+              autoComplete="off"
+              onChange={(e) => {
+                setPlaceName(e.target.value);
+                placeNameAC.fetchSuggestions(e.target.value);
+              }}
+              onFocus={() => setPlaceNameFocused(true)}
+              onBlur={() => setTimeout(() => setPlaceNameFocused(false), 150)}
               className="w-full bg-background/50 border border-border/40 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
               placeholder="e.g., Neon Beach Club"
             />
+
+            {/* Place Name suggestions dropdown */}
+            {placeNameFocused && placeNameAC.suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/40 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                {placeNameAC.suggestions.map((s) => (
+                  <button
+                    key={s.placeId}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyPlace(s.placeId, s.mainText, "placeName")}
+                    className="w-full text-left px-3 py-2.5 hover:bg-foreground/10 border-b border-border/20 last:border-0 transition-colors"
+                  >
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{s.mainText}</p>
+                        <p className="text-[11px] text-foreground/60 truncate">{s.secondaryText}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Neighborhood */}
+          {/* ── Neighborhood ────────────────────────────────────────────── */}
           <div>
             <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
               Neighborhood
@@ -200,7 +226,7 @@ export function LocationEditModal({
             />
           </div>
 
-          {/* City */}
+          {/* ── City ────────────────────────────────────────────────────── */}
           <div>
             <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
               City
@@ -214,7 +240,7 @@ export function LocationEditModal({
             />
           </div>
 
-          {/* Coordinates */}
+          {/* ── Coordinates ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
@@ -242,7 +268,7 @@ export function LocationEditModal({
             </div>
           </div>
 
-          {/* Map Preview */}
+          {/* ── Map Preview ─────────────────────────────────────────────── */}
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-foreground/70">
               Map Preview
@@ -260,7 +286,7 @@ export function LocationEditModal({
             </div>
           </div>
 
-          {/* Actions */}
+          {/* ── Actions ─────────────────────────────────────────────────── */}
           <div className="flex gap-2 pt-4">
             <button
               onClick={onClose}
@@ -273,9 +299,10 @@ export function LocationEditModal({
               disabled={isSaving}
               className="flex-1 bg-gradient-sunset text-xs font-bold py-3 rounded-xl text-primary-foreground active:scale-95 transition-transform disabled:opacity-50 shadow-glow-coral"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving ? "Saving…" : "Save Changes"}
             </button>
           </div>
+
         </div>
       </motion.div>
     </motion.div>

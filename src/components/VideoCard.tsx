@@ -9,8 +9,10 @@ import {
   Radio,
   Play,
   Film,
-  Shield,
+  MapPin,
   Edit3,
+  Tv2,
+  EyeOff,
 } from "lucide-react";
 import { type VibePost, timeAgo, slugify } from "@/data/vibes";
 import { Link } from "@tanstack/react-router";
@@ -24,6 +26,7 @@ import { useFirebase } from "@/lib/FirebaseContext";
 import { LocationEditModal } from "./LocationEditModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 
 interface Props {
   post: VibePost;
@@ -46,11 +49,38 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [voted, setVoted] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  
+
+  // ── Cinematic / clean-screen mode ────────────────────────────────────────
+  const [cinematic, setCinematic] = useState(false);
+
+  // ── Local mute state (source of truth for the <video> element) ───────────
+  const [isMuted, setIsMuted] = useState(muted);
+
+  // Keep local state in sync when parent prop changes (e.g. first-load)
+  useEffect(() => {
+    setIsMuted(muted);
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
+
+  // Sync mute to video element whenever isMuted changes
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = isMuted;
+  }, [isMuted]);
+
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = !isMuted;
+    setIsMuted(next);
+    if (videoRef.current) videoRef.current.muted = next;
+    onToggleMute(); // keep parent in sync
+  };
+
   // Tag Location Modal State
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [tagFocused, setTagFocused] = useState(false);
   const [isModMode, setIsModMode] = useState(false);
+  const tagAC = usePlacesAutocomplete();
 
   const { comments } = useComments(post.id);
   const commentCount = post.comments + comments.filter((c) => !c.id.startsWith("c")).length;
@@ -59,19 +89,17 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
 
   // Check if user already voted for this location
   useEffect(() => {
-    if (!user || !post.verificationStatus === "unverified") return;
-    
+    if (!user || post.verificationStatus !== "unverified") return;
+
     const checkVote = async () => {
       try {
         const userVote = await getUserVoteForLocation(user.uid, post.id);
-        if (userVote) {
-          setVoted(true);
-        }
+        if (userVote) setVoted(true);
       } catch (error) {
         console.error("Error checking vote", error);
       }
     };
-    
+
     checkVote();
   }, [user, post.id]);
 
@@ -90,27 +118,29 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   }, [active]);
 
   const handleTap = () => {
+    // In cinematic mode, any tap exits it
+    if (cinematic) {
+      setCinematic(false);
+      return;
+    }
+
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
     const v = videoRef.current;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      // Double tap detected
-      lastTapRef.current = 0; // reset
+      lastTapRef.current = 0;
       if (!liked) {
         setLiked(true);
         trackVibeInteraction(post.category);
       }
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 700);
-
-      // Resume video if the first tap paused it
       if (v && v.paused) {
         v.play().catch(() => {});
         setIsPlaying(true);
       }
     } else {
-      // Single tap - pause/play immediately
       lastTapRef.current = now;
       if (v) {
         if (isPlaying) {
@@ -127,7 +157,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/place/${slugify(post.placeName)}`;
     const shareData = {
-      title: `${post.username} checking in at ${post.placeName} on VibeCheck`,
+      title: `${post.username} checking in at ${post.placeName} on LitScene`,
       text: post.caption,
       url: shareUrl,
     };
@@ -137,9 +167,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareUrl);
-        toast("Link copied to clipboard", {
-          description: "Share the vibe with your friends.",
-        });
+        toast("Link copied to clipboard", { description: "Share the vibe with your friends." });
       }
     } catch (err) {
       if (err instanceof Error && err.name !== "AbortError") {
@@ -150,30 +178,45 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
 
   return (
     <section className="relative h-full w-full overflow-hidden bg-background">
+      {/* ── Raw video — no overlays touching it ─────────────────────────── */}
       <video
         ref={videoRef}
         src={post.videoUrl}
         poster={post.poster}
         loop
         playsInline
-        muted={muted}
+        muted={isMuted}
         className="absolute inset-0 h-full w-full object-cover"
         onClick={handleTap}
       />
 
-      {/* gradient veil for legibility */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-vibe" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-background/70 to-transparent" />
+      {/* ── Gradient overlays — only at very bottom, feathered ─────────── */}
+      {/* Bottom scrim: starts transparent, only darkens bottom 30% */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%]"
+        style={{
+          background:
+            "linear-gradient(to top, oklch(0.14 0.05 285 / 0.92) 0%, oklch(0.14 0.05 285 / 0.55) 40%, transparent 100%)",
+        }}
+      />
+      {/* Top scrim: only for readability of top badges */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-28"
+        style={{
+          background:
+            "linear-gradient(to bottom, oklch(0.14 0.05 285 / 0.55) 0%, transparent 100%)",
+        }}
+      />
 
-      {/* Pause indicator overlay */}
+      {/* ── Pause indicator ──────────────────────────────────────────────── */}
       <AnimatePresence>
-        {!isPlaying && (
+        {!isPlaying && !cinematic && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
-            className="pointer-events-none absolute inset-0 grid place-items-center bg-background/5"
+            className="pointer-events-none absolute inset-0 grid place-items-center"
           >
             <div className="grid h-20 w-20 place-items-center rounded-full bg-background/20 backdrop-blur-md shadow-[0_0_30px_rgba(0,0,0,0.15)]">
               <Play className="h-10 w-10 ml-1.5 text-white/90" fill="currentColor" />
@@ -182,7 +225,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         )}
       </AnimatePresence>
 
-      {/* double-tap heart */}
+      {/* ── Double-tap heart ─────────────────────────────────────────────── */}
       <AnimatePresence>
         {showHeart && (
           <motion.div
@@ -197,184 +240,231 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Top right: vibe + live */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="flex flex-col items-end gap-2">
-          <VibeBadge score={post.vibeScore} />
-          {post.isLive && (
-            <div className="glass-dark inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-glow-magenta">
-              <Radio className="h-3 w-3 text-secondary animate-pulse" />
-              <span className="text-[10px] font-display font-bold uppercase tracking-widest text-secondary">
-                Live
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Middle Left: place pin + reels */}
-      <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-2 pointer-events-auto">
-        <div className="relative group">
-          <PlacePin 
-            name={post.placeName} 
-            neighborhood={post.neighborhood} 
-            status={post.verificationStatus} 
-          />
-          {post.verificationStatus === "crowdsource" && (
-            <button 
-              className="absolute inset-x-0 inset-y-0 z-20 w-full h-full cursor-pointer"
-              onClick={(e) => { e.preventDefault(); setTagModalOpen(true); }}
-              aria-label="Tag Location"
-            />
-          )}
-          {/* Admin Edit Button */}
-          {isAdmin && (
-            <button 
-              onClick={() => setEditModalOpen(true)}
-              className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
-              title="Edit Location"
-            >
-              <Edit3 className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-
-        {/* Waze style verification prompt */}
-        {post.verificationStatus === "unverified" && !voted && (
+      {/* ══ ALL UI overlays — hidden in cinematic mode ══════════════════════ */}
+      <AnimatePresence>
+        {!cinematic && (
           <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="glass-dark rounded-xl p-2.5 shadow-soft border border-accent/20 w-[180px]"
+            key="ui-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="contents"
           >
-            <p className="text-[11px] font-bold mb-2 leading-tight">
-              Is this {post.placeName}?
-            </p>
-            <div className="flex items-center gap-1.5">
+            {/* Top row: vibe badge + live + cinematic toggle */}
+            <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+              {/* Cinematic / full-screen button (top-left) */}
               <button
-                onClick={async () => {
-                  if (!user) {
-                    toast.error("Must be logged in to vote");
-                    return;
-                  }
-                  setVoted(true);
-                  await recordLocationVote(user.uid, post.id, "yes");
-                  toast.success("Thanks for verifying!", { description: "+5 Trust Score. 9 more 'Yes' votes to verify." });
-                }}
-                className="flex-1 bg-accent/20 active:bg-accent/30 text-accent font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-accent/30"
+                onClick={(e) => { e.stopPropagation(); setCinematic(true); }}
+                className="grid h-9 w-9 place-items-center rounded-full glass-dark text-foreground/80 active:scale-90 transition-transform"
+                aria-label="Cinematic mode — hide UI"
               >
-                Yes
+                <Tv2 className="h-4 w-4" />
               </button>
+
+              {/* Right: badges */}
+              <div className="flex flex-col items-end gap-2">
+                <VibeBadge score={post.vibeScore} />
+                {post.isLive && (
+                  <div className="glass-dark inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-glow-magenta">
+                    <Radio className="h-3 w-3 text-secondary animate-pulse" />
+                    <span className="text-[10px] font-display font-bold uppercase tracking-widest text-secondary">
+                      Live
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Middle Left: place pin + reels */}
+            <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex flex-col items-start gap-2 pointer-events-auto">
+              <div className="relative group">
+                <PlacePin
+                  name={post.placeName}
+                  neighborhood={post.neighborhood}
+                  status={post.verificationStatus}
+                />
+                {post.verificationStatus === "crowdsource" && (
+                  <button
+                    className="absolute inset-x-0 inset-y-0 z-20 w-full h-full cursor-pointer"
+                    onClick={(e) => { e.preventDefault(); setTagModalOpen(true); }}
+                    aria-label="Tag Location"
+                  />
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => setEditModalOpen(true)}
+                    className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
+                    title="Edit Location"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Waze-style verification prompt */}
+              {post.verificationStatus === "unverified" && !voted && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="glass-dark rounded-xl p-2.5 shadow-soft border border-accent/20 w-[180px]"
+                >
+                  <p className="text-[11px] font-bold mb-2 leading-tight">
+                    Is this {post.placeName}?
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={async () => {
+                        if (!user) { toast.error("Must be logged in to vote"); return; }
+                        setVoted(true);
+                        await recordLocationVote(user.uid, post.id, "yes");
+                        toast.success("Thanks for verifying!", { description: "+5 Trust Score. 9 more 'Yes' votes to verify." });
+                      }}
+                      className="flex-1 bg-accent/20 active:bg-accent/30 text-accent font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-accent/30"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!user) { toast.error("Must be logged in to vote"); return; }
+                        setVoted(true);
+                        await recordLocationVote(user.uid, post.id, "no");
+                        toast("Flagged for review", { description: "We'll wait for more community input." });
+                      }}
+                      className="flex-1 bg-foreground/10 active:bg-foreground/20 text-foreground font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-foreground/10"
+                    >
+                      No
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {(!post.verificationStatus || post.verificationStatus === "verified") ? (
+                <Link
+                  to="/reel/$slug"
+                  params={{ slug: slugify(post.placeName) }}
+                  className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
+                    <Film className="h-3.5 w-3.5 text-primary-foreground" />
+                  </span>
+                  <span className="font-display text-[10px] font-bold uppercase tracking-widest text-foreground">
+                    Reel
+                  </span>
+                </Link>
+              ) : null}
+            </div>
+
+            {/* Right rail actions */}
+            <div className="absolute bottom-28 right-3 z-10 flex flex-col items-center gap-5">
+              {/* Like */}
               <button
-                onClick={async () => {
-                  if (!user) {
-                    toast.error("Must be logged in to vote");
-                    return;
-                  }
-                  setVoted(true);
-                  await recordLocationVote(user.uid, post.id, "no");
-                  toast("Flagged for review", { description: "We'll wait for more community input." });
+                onClick={() => {
+                  if (!liked) trackVibeInteraction(post.category);
+                  setLiked((s) => !s);
                 }}
-                className="flex-1 bg-foreground/10 active:bg-foreground/20 text-foreground font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-foreground/10"
+                className="flex flex-col items-center gap-1 transition-transform active:scale-90"
               >
-                No
+                <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
+                  <Heart
+                    className={`h-6 w-6 transition-colors ${
+                      liked ? "fill-primary text-primary" : "text-foreground"
+                    }`}
+                  />
+                </span>
+                <span className="text-xs font-semibold text-foreground/90">
+                  {formatCount(post.likes + (liked ? 1 : 0))}
+                </span>
               </button>
+
+              {/* Comments */}
+              <button
+                onClick={() => setCommentsOpen(true)}
+                className="flex flex-col items-center gap-1 active:scale-90"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
+                  <MessageCircle className="h-6 w-6" />
+                </span>
+                <span className="text-xs font-semibold text-foreground/90">
+                  {formatCount(commentCount)}
+                </span>
+              </button>
+
+              {/* Save */}
+              <button className="flex flex-col items-center gap-1 active:scale-90">
+                <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
+                  <Bookmark className="h-6 w-6" />
+                </span>
+                <span className="text-xs font-semibold text-foreground/90">Save</span>
+              </button>
+
+              {/* Share */}
+              <button onClick={handleShare} className="flex flex-col items-center gap-1 active:scale-90">
+                <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
+                  <Share2 className="h-6 w-6" />
+                </span>
+                <span className="text-xs font-semibold text-foreground/90">Share</span>
+              </button>
+
+              {/* Volume — uses local isMuted state ───────────── */}
+              <button
+                onClick={handleToggleMute}
+                className="grid h-12 w-12 place-items-center rounded-full glass-dark active:scale-90 transition-transform"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? (
+                  <VolumeX className="h-5 w-5 text-foreground/80" />
+                ) : (
+                  <Volume2 className="h-5 w-5 text-foreground" />
+                )}
+              </button>
+            </div>
+
+            {/* Bottom caption + meta */}
+            <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-24">
+              <div className="max-w-[78%] space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-base font-bold text-gradient-sunset">
+                    {post.username}
+                  </span>
+                  <span className="text-xs text-foreground/60">· {timeAgo(post.postedAt)}</span>
+                </div>
+                <p className="text-sm leading-snug text-foreground/95">{post.caption}</p>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="rounded-full glass px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                    #{post.category}
+                  </span>
+                  <span className="rounded-full glass px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                    #{post.neighborhood.replace(/\s+/g, "")}
+                  </span>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
-        
-        {!post.verificationStatus || post.verificationStatus === "verified" ? (
-          <Link
-            to="/reel/$slug"
-            params={{ slug: slugify(post.placeName) }}
-            className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1"
+      </AnimatePresence>
+
+      {/* ── Cinematic mode hint — tap to restore ─────────────────────────── */}
+      <AnimatePresence>
+        {cinematic && (
+          <motion.div
+            key="cinematic-hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="pointer-events-none absolute bottom-8 inset-x-0 flex justify-center"
           >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">
-              <Film className="h-3.5 w-3.5 text-primary-foreground" />
-            </span>
-            <span className="font-display text-[10px] font-bold uppercase tracking-widest text-foreground">
-              Reel
-            </span>
-          </Link>
-        ) : null}
-      </div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-background/30 backdrop-blur-sm px-4 py-2 border border-white/10">
+              <EyeOff className="h-3.5 w-3.5 text-white/60" />
+              <span className="text-[11px] font-semibold text-white/60 tracking-wide">
+                Tap to show UI
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Right rail actions */}
-      <div className="absolute bottom-28 right-3 z-10 flex flex-col items-center gap-5">
-        <button
-          onClick={() => {
-            if (!liked) trackVibeInteraction(post.category);
-            setLiked((s) => !s);
-          }}
-          className="flex flex-col items-center gap-1 transition-transform active:scale-90"
-        >
-          <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
-            <Heart
-              className={`h-6 w-6 transition-colors ${
-                liked ? "fill-primary text-primary" : "text-foreground"
-              }`}
-            />
-          </span>
-          <span className="text-xs font-semibold text-foreground/90">
-            {formatCount(post.likes + (liked ? 1 : 0))}
-          </span>
-        </button>
-        <button
-          onClick={() => setCommentsOpen(true)}
-          className="flex flex-col items-center gap-1 active:scale-90"
-        >
-          <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
-            <MessageCircle className="h-6 w-6" />
-          </span>
-          <span className="text-xs font-semibold text-foreground/90">
-            {formatCount(commentCount)}
-          </span>
-        </button>
-        <button className="flex flex-col items-center gap-1 active:scale-90">
-          <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
-            <Bookmark className="h-6 w-6" />
-          </span>
-          <span className="text-xs font-semibold text-foreground/90">Save</span>
-        </button>
-        <button onClick={handleShare} className="flex flex-col items-center gap-1 active:scale-90">
-          <span className="grid h-12 w-12 place-items-center rounded-full glass-dark">
-            <Share2 className="h-6 w-6" />
-          </span>
-          <span className="text-xs font-semibold text-foreground/90">Share</span>
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleMute();
-            if (videoRef.current) {
-              videoRef.current.muted = !muted;
-            }
-          }}
-          className="grid h-10 w-10 place-items-center rounded-full glass-dark active:scale-90"
-        >
-          {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-        </button>
-      </div>
-
-      {/* Bottom: caption + meta */}
-      <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-24">
-        <div className="max-w-[78%] space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-base font-bold text-gradient-sunset">
-              {post.username}
-            </span>
-            <span className="text-xs text-foreground/60">· {timeAgo(post.postedAt)}</span>
-          </div>
-          <p className="text-sm leading-snug text-foreground/95">{post.caption}</p>
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            <span className="rounded-full glass px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              #{post.category}
-            </span>
-            <span className="rounded-full glass px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              #{post.neighborhood.replace(/\s+/g, "")}
-            </span>
-          </div>
-        </div>
-      </div>
       <CommentsDrawer
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}
@@ -402,24 +492,59 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             >
               <h3 className="font-display font-black text-xl mb-1">Tag Location</h3>
               <p className="text-xs text-foreground/60 mb-5">Know this spot? Help the community out by tagging it.</p>
-              
-              <input
-                autoFocus
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                placeholder="Where is this?"
-                className="w-full bg-background/50 border border-border/40 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 mb-4"
-              />
+
+              <div className="relative mb-4">
+                <input
+                  autoFocus
+                  value={tagInput}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    setTagInput(e.target.value);
+                    tagAC.fetchSuggestions(e.target.value);
+                  }}
+                  onFocus={() => setTagFocused(true)}
+                  onBlur={() => setTimeout(() => setTagFocused(false), 150)}
+                  placeholder="Where is this?"
+                  className="w-full bg-background/50 border border-border/40 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
+                />
+
+                {tagFocused && tagAC.suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/40 rounded-xl shadow-lg z-30 max-h-44 overflow-y-auto">
+                    {tagAC.suggestions.map((s) => (
+                      <button
+                        key={s.placeId}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={async () => {
+                          setTagInput(s.mainText);
+                          tagAC.clearSuggestions();
+                          await tagAC.resolvePlaceDetails(s.placeId);
+                        }}
+                        className="w-full text-left px-3 py-2.5 hover:bg-foreground/10 border-b border-border/20 last:border-0 transition-colors"
+                      >
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{s.mainText}</p>
+                            <p className="text-[11px] text-foreground/60 truncate">{s.secondaryText}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center gap-2 mb-5">
-                <input 
-                  type="checkbox" 
-                  id={`mod-check-${post.id}`} 
-                  checked={isModMode} 
-                  onChange={(e) => setIsModMode(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  id={`mod-check-${post.id}`}
+                  checked={isModMode}
+                  onChange={(e) => setIsModMode(e.target.checked)}
                   className="accent-primary"
                 />
-                <label htmlFor={`mod-check-${post.id}`} className="text-[10px] text-foreground/60 uppercase tracking-widest font-bold">Simulate: I am a Verified Mod</label>
+                <label htmlFor={`mod-check-${post.id}`} className="text-[10px] text-foreground/60 uppercase tracking-widest font-bold">
+                  Simulate: I am a Verified Mod
+                </label>
               </div>
 
               <div className="flex gap-2">
