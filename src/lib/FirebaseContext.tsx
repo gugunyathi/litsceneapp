@@ -5,10 +5,12 @@ import { toast } from "sonner";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { AuthModal } from "./AuthModal";
+import { isAdmin, initializeAdminUsers } from "./locationVotes";
 
 interface FirebaseContextType {
   user: User | null;
   loading: boolean;
+  isAdmin: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   requireAuth: () => boolean;
@@ -17,6 +19,7 @@ interface FirebaseContextType {
 const FirebaseContext = createContext<FirebaseContextType>({
   user: null,
   loading: true,
+  isAdmin: false,
   login: async () => {},
   logout: async () => {},
   requireAuth: () => false,
@@ -28,14 +31,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [adminStatus, setAdminStatus] = useState(false);
 
   useEffect(() => {
     testConnection(); // Ensure connection works
+    initializeAdminUsers(); // Initialize admin users in Firestore
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        setAuthModalOpen(false); // Make sure it closes if it was open
+        setAdminStatus(isAdmin(currentUser.email || undefined));
+        setAuthModalOpen(false);
         // Provision user profile lazily
         const userRef = doc(db, "users", currentUser.uid);
         const snap = await getDoc(userRef);
@@ -61,6 +67,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null);
+        setAdminStatus(false);
       }
       setLoading(false);
     });
@@ -94,7 +101,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <FirebaseContext.Provider value={{ user, loading, login, logout, requireAuth }}>
+    <FirebaseContext.Provider value={{ user, loading, isAdmin: adminStatus, login, logout, requireAuth }}>
       {children}
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </FirebaseContext.Provider>

@@ -10,6 +10,7 @@ import {
   Play,
   Film,
   Shield,
+  Edit3,
 } from "lucide-react";
 import { type VibePost, timeAgo, slugify } from "@/data/vibes";
 import { Link } from "@tanstack/react-router";
@@ -18,6 +19,9 @@ import { PlacePin } from "./PlacePin";
 import { CommentsDrawer } from "./CommentsDrawer";
 import { useComments } from "@/data/comments";
 import { trackVibeInteraction } from "@/hooks/useVibeAlgorithm";
+import { recordLocationVote, getUserVoteForLocation } from "@/lib/locationVotes";
+import { useFirebase } from "@/lib/FirebaseContext";
+import { LocationEditModal } from "./LocationEditModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -35,11 +39,13 @@ function formatCount(n: number) {
 
 export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { user, isAdmin } = useFirebase();
   const [liked, setLiked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [voted, setVoted] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   
   // Tag Location Modal State
   const [tagModalOpen, setTagModalOpen] = useState(false);
@@ -50,6 +56,24 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
   const commentCount = post.comments + comments.filter((c) => !c.id.startsWith("c")).length;
 
   const lastTapRef = useRef<number>(0);
+
+  // Check if user already voted for this location
+  useEffect(() => {
+    if (!user || !post.verificationStatus === "unverified") return;
+    
+    const checkVote = async () => {
+      try {
+        const userVote = await getUserVoteForLocation(user.uid, post.id);
+        if (userVote) {
+          setVoted(true);
+        }
+      } catch (error) {
+        console.error("Error checking vote", error);
+      }
+    };
+    
+    checkVote();
+  }, [user, post.id]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -203,14 +227,16 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
               aria-label="Tag Location"
             />
           )}
-          {/* Mod Override (Simulated) */}
-          <button 
-            onClick={() => toast("Mod Override Panel 🛡️", { description: "You can now edit the name, category, or delete the tag entirely." })}
-            className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
-            title="Moderator Edit"
-          >
-            <Shield className="h-3 w-3" />
-          </button>
+          {/* Admin Edit Button */}
+          {isAdmin && (
+            <button 
+              onClick={() => setEditModalOpen(true)}
+              className="absolute -top-3 -right-3 grid h-6 w-6 place-items-center z-30 rounded-full bg-accent text-accent-foreground opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 shadow-glow-coral"
+              title="Edit Location"
+            >
+              <Edit3 className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         {/* Waze style verification prompt */}
@@ -225,8 +251,13 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
             </p>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  if (!user) {
+                    toast.error("Must be logged in to vote");
+                    return;
+                  }
                   setVoted(true);
+                  await recordLocationVote(user.uid, post.id, "yes");
                   toast.success("Thanks for verifying!", { description: "+5 Trust Score. 9 more 'Yes' votes to verify." });
                 }}
                 className="flex-1 bg-accent/20 active:bg-accent/30 text-accent font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-accent/30"
@@ -234,8 +265,13 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 Yes
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  if (!user) {
+                    toast.error("Must be logged in to vote");
+                    return;
+                  }
                   setVoted(true);
+                  await recordLocationVote(user.uid, post.id, "no");
                   toast("Flagged for review", { description: "We'll wait for more community input." });
                 }}
                 className="flex-1 bg-foreground/10 active:bg-foreground/20 text-foreground font-display text-[10px] uppercase font-bold py-1.5 rounded-lg border border-foreground/10"
@@ -413,6 +449,13 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Location Edit Modal */}
+      <LocationEditModal
+        post={post}
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+      />
     </section>
   );
 }
