@@ -46,7 +46,7 @@ function FeedPage() {
   const [category, setCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [muted, setMuted] = useState(true); // Must start muted for browser autoplay!
+  const [muted, setMuted] = useState(false); // Volume on by default
   const [activeIdx, setActiveIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 

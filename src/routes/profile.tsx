@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Flame,
   Trophy,
@@ -15,6 +15,10 @@ import {
 import { BottomNav } from "@/components/BottomNav";
 import { VIBE_POSTS, fireScore } from "@/data/vibes";
 import { useBookings } from "@/data/bookings";
+import { useFirebase } from "@/lib/FirebaseContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -29,21 +33,88 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
+  const { user, loading } = useFirebase();
   const [profile, setProfile] = useState({
-    username: "@vibehunter",
-    city: "Miami",
+    handle: "@guest",
+    city: "Unknown",
+    avatar: "🌴",
+    firePoints: 0,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(profile);
   const [activeTab, setActiveTab] = useState<"posts" | "saved">("posts");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load user profile from Firebase
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadProfile = async () => {
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setProfile({
+            handle: data.handle || "@guest",
+            city: data.city || "Unknown",
+            avatar: data.avatar || "🌴",
+            firePoints: data.firePoints || 0,
+          });
+          setEditForm({
+            handle: data.handle || "@guest",
+            city: data.city || "Unknown",
+            avatar: data.avatar || "🌴",
+            firePoints: data.firePoints || 0,
+          });
+        }
+      } catch (error) {
+        console.error("Error loading profile", error);
+        toast.error("Failed to load profile");
+      }
+    };
+    
+    loadProfile();
+  }, [user]);
 
   const myPosts = VIBE_POSTS.slice(0, 6);
   const savedSpots = VIBE_POSTS.slice(6, 12);
 
-  const handleSaveProfile = () => {
-    setProfile(editForm);
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("Must be logged in to save profile");
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        handle: editForm.handle,
+        city: editForm.city,
+        avatar: editForm.avatar,
+        updatedAt: new Date(),
+      });
+      setProfile(editForm);
+      setIsEditing(false);
+      toast.success("Profile updated!");
+    } catch (error) {
+      console.error("Error saving profile", error);
+      toast.error("Failed to save profile");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-[100svh] w-full bg-background flex items-center justify-center pb-32">
+        <div className="text-center px-4">
+          <p className="text-foreground/60 mb-4">Please sign in to view your profile</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100svh] w-full bg-background pb-32">
@@ -53,11 +124,11 @@ function ProfilePage() {
         <div className="relative flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center rounded-full bg-background text-3xl font-display font-black shadow-soft">
-              🌴
+              {profile.avatar}
             </div>
             <div>
               <h1 className="font-display text-2xl font-black tracking-tight text-primary-foreground">
-                {profile.username}
+                {profile.handle}
               </h1>
               <p className="text-xs uppercase tracking-widest text-primary-foreground/80">
                 {profile.city} · Tier: Sunset
@@ -85,7 +156,7 @@ function ProfilePage() {
               <p className="text-[11px] uppercase tracking-widest text-foreground/60">
                 Vibe points
               </p>
-              <p className="font-display text-3xl font-black text-gradient-fire">2,840 🔥</p>
+              <p className="font-display text-3xl font-black text-gradient-fire">{profile.firePoints} 🔥</p>
             </div>
             <button className="rounded-full bg-gradient-sunset px-4 py-2 text-[11px] font-display font-bold uppercase tracking-widest text-primary-foreground shadow-glow-coral">
               Redeem
@@ -95,7 +166,7 @@ function ProfilePage() {
             <div className="h-full w-2/3 bg-gradient-fire" />
           </div>
           <p className="mt-2 text-[11px] text-foreground/60">
-            860 points to <span className="font-bold text-accent">Magenta tier</span>
+            {Math.max(0, 3000 - profile.firePoints)} points to <span className="font-bold text-accent">Magenta tier</span>
           </p>
         </div>
       </div>
@@ -194,8 +265,8 @@ function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  value={editForm.username}
-                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                  value={editForm.handle}
+                  onChange={(e) => setEditForm({ ...editForm, handle: e.target.value })}
                   className="w-full rounded-2xl border border-border/40 bg-foreground/5 px-4 py-3 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none"
                   placeholder="@yourname"
                 />
@@ -214,11 +285,26 @@ function ProfilePage() {
                 />
               </div>
 
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-foreground/70">
+                  Avatar Emoji
+                </label>
+                <input
+                  type="text"
+                  value={editForm.avatar}
+                  onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                  className="w-full rounded-2xl border border-border/40 bg-foreground/5 px-4 py-3 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none"
+                  placeholder="e.g. 🌴"
+                  maxLength={2}
+                />
+              </div>
+
               <button
                 onClick={handleSaveProfile}
-                className="mt-6 w-full rounded-full bg-gradient-sunset py-4 font-display text-sm font-bold uppercase tracking-widest text-primary-foreground active:scale-[0.98] transition-transform shadow-glow-coral"
+                disabled={isSaving}
+                className="mt-6 w-full rounded-full bg-gradient-sunset py-4 font-display text-sm font-bold uppercase tracking-widest text-primary-foreground active:scale-[0.98] transition-transform shadow-glow-coral disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Changes
+                {isSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
