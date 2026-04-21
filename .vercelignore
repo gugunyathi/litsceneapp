@@ -1,0 +1,6 @@
+dist/server
+wrangler.jsonc
+bunfig.toml
+firebase-applet-config.json
+firebase-blueprint.json
+DRAFT_firestore.rules
