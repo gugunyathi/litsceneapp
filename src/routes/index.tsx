@@ -74,13 +74,24 @@ function FeedPage() {
       filtered = filtered.filter((p) => p.vibeScore === vibeFilter);
     }
 
+    // Deduplicate: keep only the latest post per venue so each place
+    // appears once in the feed. All posts for a venue are shown in Reels.
+    const seenVenues = new Map<string, VibePost>();
+    for (const p of filtered) {
+      const existing = seenVenues.get(p.placeName);
+      if (!existing || new Date(p.postedAt) > new Date(existing.postedAt)) {
+        seenVenues.set(p.placeName, p);
+      }
+    }
+    const deduped = [...seenVenues.values()];
+
     let sorted;
     if (category === "all" && searchQuery.trim() === "") {
       // FOR YOU FEED: Uses location, time zone, and preferences
-      sorted = sortForYou(filtered);
+      sorted = sortForYou(deduped);
     } else {
       // Chronological sort for specific searches/categories
-      sorted = [...filtered].sort(
+      sorted = [...deduped].sort(
         (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
       );
     }
