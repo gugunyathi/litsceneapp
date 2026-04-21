@@ -31,8 +31,9 @@ export function SwipeableFeedCard({ initialPost, active, muted, onToggleMute }: 
   const [venueIdx, setVenueIdx] = useState(0);
   const [direction, setDirection] = useState(0);
 
-  // For each venue, latest post
+  // For each venue, latest post (but keep the exact initialPost when at index 0)
   const currentPost = useMemo(() => {
+    if (venueIdx === 0) return initialPost;
     const name = venueChain[venueIdx];
     const posts = getPostsByPlace(name);
     if (posts.length > 0) return posts[0];
