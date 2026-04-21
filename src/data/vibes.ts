@@ -18,6 +18,7 @@ export interface VibePost {
   comments: number;
   isLive?: boolean;
   verificationStatus?: "verified" | "unverified" | "crowdsource";
+  isSystem?: boolean; // true = hardcoded system video, always visible; false/undefined = user upload
 }
 
 // Vertical sample videos located in public folder
@@ -85,9 +86,11 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
 
 // ============================================================
 // VIBE POSTS — grouped by establishment, sorted by filename
+// All hardcoded posts are system posts (isSystem: true) — always
+// visible everywhere, no time-window restrictions.
 // ============================================================
 
-export const VIBE_POSTS: VibePost[] = [
+const SYSTEM_POSTS: Omit<VibePost, "isSystem">[] = [
 
   // --- BOWLD RESTAURANT (Morningside, Sandton) ---
   // 1st Floor, Masingita Towers, 15 West Road South, Morningside, Sandton
@@ -558,6 +561,10 @@ export const VIBE_POSTS: VibePost[] = [
   },
 ];
 
+// Stamp isSystem: true on every hardcoded post.
+// User-uploaded posts added at runtime will NOT have this flag.
+export const VIBE_POSTS: VibePost[] = SYSTEM_POSTS.map((p) => ({ ...p, isSystem: true }));
+
 export const CATEGORIES: { id: Category | "all"; label: string; emoji: string }[] = [
   { id: "all", label: "All", emoji: "✨" },
   { id: "club", label: "Clubs", emoji: "🪩" },
@@ -1002,8 +1009,12 @@ export function getPostsByPlace(placeName: string): VibePost[] {
  * maximum past 1 hour from realtime.
  */
 export function getReelPostsForPlace(slug: string): VibePost[] {
+  const oneHourAgo = BASE_TIME - 60 * 60 * 1000;
+
   return VIBE_POSTS
     .filter((p) => slugify(p.placeName) === slug)
+    // System videos always show; user uploads only within the last hour
+    .filter((p) => p.isSystem === true || new Date(p.postedAt).getTime() >= oneHourAgo)
     // Sort closest to real time (latest to oldest)
     .sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
 }
