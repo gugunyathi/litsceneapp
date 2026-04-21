@@ -378,7 +378,7 @@ export function VideoCard({ post, active, muted, onToggleMute }: Props) {
                 <Link
                   to="/reel/$slug"
                   params={{ slug: slugify(post.placeName) }}
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); sessionStorage.setItem("reelReturnPostId", post.id); }}
                   className="glass-dark inline-flex items-center gap-2 rounded-full py-2 px-3 shadow-pin active:scale-95 transition-transform mt-1 pointer-events-auto"
                 >
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-sunset shadow-glow-coral">

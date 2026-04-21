@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, X, ListFilter } from "lucide-react";
 import { type Category } from "@/data/vibes";
@@ -16,7 +16,9 @@ type FeedItem =
   | { kind: "post"; id: string; data: VibePost }
   | { kind: "promo"; id: string; data: PromoPost };
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/")({  validateSearch: (search: Record<string, unknown>) => ({
+    returnPostId: typeof search.returnPostId === "string" ? search.returnPostId : undefined,
+  }),
   loader: async () => {
     // This allows the server to fetch directly from your new Firebase backend!
     const posts = await fetchAllPosts();
@@ -42,6 +44,7 @@ export const Route = createFileRoute("/")({
 
 function FeedPage() {
   const { posts } = Route.useLoaderData();
+  const { returnPostId } = useSearch({ from: "/" });
   const { sortForYou } = useVibeAlgorithm(posts);
   const [category, setCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,6 +140,23 @@ function FeedPage() {
     setActiveIdx(0);
   }, [category, searchQuery]);
 
+  // Restore scroll to the post that triggered a reel view
+  useEffect(() => {
+    if (!returnPostId || items.length === 0) return;
+    const idx = items.findIndex((item) => item.kind === "post" && item.data.id === returnPostId);
+    if (idx < 0) return;
+    const root = containerRef.current;
+    if (!root) return;
+    // Wait one frame for layout
+    requestAnimationFrame(() => {
+      const card = root.querySelector<HTMLElement>(`[data-card-idx="${idx}"]`);
+      card?.scrollIntoView({ behavior: "auto" });
+      setActiveIdx(idx);
+    });
+  // Only run once when items are ready
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnPostId, items.length]);
+
   return (
     <div className="relative h-[100svh] w-full overflow-hidden bg-background">
       {/* top header */}
@@ -227,7 +247,7 @@ function FeedPage() {
       {/* feed */}
       <div
         ref={containerRef}
-        className="snap-y-mandatory no-scrollbar h-full w-full overflow-y-scroll overscroll-contain"
+        className="snap-y snap-mandatory no-scrollbar h-full w-full overflow-y-scroll overscroll-contain"
       >
         {items.map((item, i) => (
           <div
